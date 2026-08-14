@@ -1,7 +1,6 @@
 """
 SafeStation AI — Main entry point
-Reads sensors, triggers alerts, sends telemetry to Azure IoT Hub,
-stores events in Cosmos DB, and triages incidents with AI.
+Full pipeline: sensors → alerts → camera → AI triage → IoT Hub → Cosmos DB → email
 """
 
 import RPi.GPIO as GPIO
@@ -16,6 +15,7 @@ from alert_manager import setup_buzzer, trigger_alert, silence_buzzer
 from camera_capture import capture_snapshot
 from cosmos_client import connect_cosmos, store_event
 from triage_agent import connect_openai, triage_incident
+from comms_agent import connect_comms, send_alert_email
 
 load_dotenv()
 
@@ -61,11 +61,13 @@ def main():
     iot_client = connect_iot_hub()
     cosmos_connected = connect_cosmos()
     ai_connected = connect_openai()
+    comms_connected = connect_comms()
 
     print("\nAll systems initialized. Monitoring started.")
     print("Press Ctrl+C to stop.\n")
 
     last_upload_time = time.time()
+    last_email_time = 0
     reading_count = 0
 
     try:
@@ -95,10 +97,18 @@ def main():
                     print(f"  AI Triage: {t['severity']} | Confidence: {t['confidence']}")
                     print(f"  Summary: {t['alert_summary']}")
 
+                # Send to cloud
                 if iot_client:
                     send_telemetry(iot_client, event)
                 if cosmos_connected:
                     store_event(event)
+
+                # Send email alert (max once per 2 minutes to avoid spam)
+                now = time.time()
+                if comms_connected and (now - last_email_time > 120):
+                    send_alert_email(event)
+                    last_email_time = now
+
             else:
                 silence_buzzer()
                 if reading_count % 6 == 0:
