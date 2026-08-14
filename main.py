@@ -1,7 +1,7 @@
 """
 SafeStation AI — Main entry point
 Reads sensors, triggers alerts, sends telemetry to Azure IoT Hub,
-and stores events in Cosmos DB.
+stores events in Cosmos DB, and triages incidents with AI.
 """
 
 import RPi.GPIO as GPIO
@@ -15,16 +15,14 @@ from sensor_reader import setup_gpio, read_sensors
 from alert_manager import setup_buzzer, trigger_alert, silence_buzzer
 from camera_capture import capture_snapshot
 from cosmos_client import connect_cosmos, store_event
+from triage_agent import connect_openai, triage_incident
 
-# Load environment variables
 load_dotenv()
 
 
 def connect_iot_hub():
-    """Connect to Azure IoT Hub."""
     conn_str = os.getenv("IOT_HUB_CONNECTION_STRING")
     if not conn_str:
-        print("ERROR: No IoT Hub connection string in .env")
         return None
     try:
         client = IoTHubDeviceClient.create_from_connection_string(conn_str)
@@ -37,12 +35,11 @@ def connect_iot_hub():
 
 
 def send_telemetry(client, event):
-    """Send an event to Azure IoT Hub as a JSON message."""
     try:
-        message = Message(json.dumps(event))
+        message = Message(json.dumps(event, default=str))
         message.content_type = "application/json"
         message.content_encoding = "utf-8"
-        if event["is_incident"]:
+        if event.get("is_incident"):
             message.custom_properties["alert_type"] = "incident"
         else:
             message.custom_properties["alert_type"] = "routine"
@@ -57,16 +54,15 @@ def main():
     print("  SafeStation AI — Starting up")
     print("=" * 50)
 
-    # Initialize hardware
     GPIO.setmode(GPIO.BCM)
     setup_gpio()
     setup_buzzer()
 
-    # Connect to cloud services
     iot_client = connect_iot_hub()
     cosmos_connected = connect_cosmos()
+    ai_connected = connect_openai()
 
-    print("Sensors initialized. Monitoring started.")
+    print("\nAll systems initialized. Monitoring started.")
     print("Press Ctrl+C to stop.\n")
 
     last_upload_time = time.time()
@@ -80,19 +76,25 @@ def main():
             if event["is_incident"]:
                 trigger_alert(event["alerts"])
 
-                # Capture camera snapshot on incident
+                # Camera snapshot
                 snapshot_path = capture_snapshot()
                 event["snapshot_path"] = snapshot_path if snapshot_path else "snapshot_unavailable"
 
+                # AI triage
+                if ai_connected:
+                    assessment = triage_incident(event)
+                    if assessment:
+                        event["triage"] = assessment
+
                 print(f"\n*** INCIDENT #{reading_count} ***")
                 print(f"  Alerts: {', '.join(event['alerts'])}")
-                print(f"  Temp: {event['temperature_c']}C")
-                print(f"  Humidity: {event['humidity_pct']}%")
-                print(f"  Gas: {event['gas_detected']}")
-                print(f"  Flame: {event['flame_detected']}")
-                print(f"  Motion: {event['motion_detected']}")
+                print(f"  Temp: {event['temperature_c']}C | Humidity: {event['humidity_pct']}%")
+                print(f"  Gas: {event['gas_detected']} | Flame: {event['flame_detected']}")
+                if "triage" in event:
+                    t = event["triage"]
+                    print(f"  AI Triage: {t['severity']} | Confidence: {t['confidence']}")
+                    print(f"  Summary: {t['alert_summary']}")
 
-                # Send incident to cloud immediately
                 if iot_client:
                     send_telemetry(iot_client, event)
                 if cosmos_connected:
