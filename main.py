@@ -16,6 +16,7 @@ from camera_capture import capture_snapshot
 from cosmos_client import connect_cosmos, store_event
 from triage_agent import connect_openai, triage_incident
 from comms_agent import connect_comms, send_alert_email
+from blob_upload import connect_blob, upload_snapshot
 
 load_dotenv()
 
@@ -62,7 +63,7 @@ def main():
     cosmos_connected = connect_cosmos()
     ai_connected = connect_openai()
     comms_connected = connect_comms()
-
+    blob_connected = connect_blob()
     print("\nAll systems initialized. Monitoring started.")
     print("Press Ctrl+C to stop.\n")
 
@@ -80,7 +81,11 @@ def main():
 
                 # Camera snapshot
                 snapshot_path = capture_snapshot()
-                event["snapshot_path"] = snapshot_path if snapshot_path else "snapshot_unavailable"
+                if snapshot_path and blob_connected:
+                    snapshot_url = upload_snapshot(snapshot_path)
+                    event["snapshot_path"] = snapshot_url if snapshot_url else snapshot_path
+                else:
+                    event["snapshot_path"] = snapshot_path if snapshot_path else "snapshot_unavailable"
 
                 # AI triage
                 if ai_connected:
