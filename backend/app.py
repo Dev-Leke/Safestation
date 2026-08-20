@@ -9,10 +9,23 @@ from azure.cosmos import CosmosClient
 from dotenv import load_dotenv
 import os
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
 CORS(app)
+
+from flask import send_from_directory
+
+@app.route('/')
+def serve_dashboard():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    try:
+        return send_from_directory('static', path)
+    except:
+        return send_from_directory('static', 'index.html')
 
 # Cosmos DB connection
 endpoint = os.getenv("COSMOS_ENDPOINT")
@@ -20,6 +33,16 @@ key = os.getenv("COSMOS_KEY")
 client = CosmosClient(endpoint, key) if endpoint and key else None
 database = client.get_database_client("safestation") if client else None
 container = database.get_container_client("incidents") if database else None
+
+def convert_snapshot_url(path):
+    """Convert local snapshot path to Blob Storage URL."""
+    if not path or path.startswith("http"):
+        return path
+    import os
+    filename = os.path.basename(path)
+    if filename:
+        return f"https://safestationstorage1.blob.core.windows.net/snapshots/{filename}"
+    return path
 
 
 def flatten_incident(doc):
@@ -50,7 +73,7 @@ def flatten_incident(doc):
         "review_notes": doc.get("review_notes", ""),
         "notification_status": doc.get("notification_status", "not_sent"),
         "notification_payload": doc.get("notification_payload"),
-        "snapshot_ref": doc.get("snapshot_path", ""),
+        "snapshot_ref": convert_snapshot_url(doc.get("snapshot_path", "")),
         "alerts": doc.get("alerts", []),
         "event_type": doc.get("event_type", "routine"),
     }
@@ -178,17 +201,19 @@ def notify_incident(incident_id):
         item = items[0]
         # Import and send email notification
         try:
-            from comms_agent import connect_comms, send_alert_email
             import sys
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-            connect_comms()
-            send_alert_email(item)
-            item["notification_status"] = "sent"
-            item["notification_payload"] = {
-                "sms_text": f"SafeStation Alert: {item.get('triage', {}).get('category', 'unknown')} at {item.get('room', '')}",
-                "email_subject": f"SafeStation Alert: {item.get('triage', {}).get('severity', 'unknown')} incident",
-                "email_body": item.get('triage', {}).get('alert_summary', '')
-            }
+            from comms_agent import connect_comms, send_alert_email
+            if connect_comms() and send_alert_email(item):
+                item["notification_status"] = "sent"
+                item["notification_payload"] = {
+                    "sms_text": f"SafeStation Alert: {item.get('triage', {}).get('category', 'unknown')} at {item.get('room', '')}",
+                    "email_subject": f"SafeStation Alert: {item.get('triage', {}).get('severity', 'unknown')} incident",
+                    "email_body": item.get('triage', {}).get('alert_summary', '')
+                }
+            else:
+                item["notification_status"] = "failed"
+                item["notification_payload"] = {"error": "Email service unavailable"}
         except Exception as notify_err:
             item["notification_status"] = "failed"
             item["notification_payload"] = {"error": str(notify_err)}

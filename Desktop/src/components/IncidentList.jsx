@@ -2,7 +2,8 @@
 
 export default function IncidentList({ incidents, selectedId, onSelect }) {
   const sorted = [...incidents].sort((a, b) => {
-    const sevDiff = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9);
+    const sevDiff =
+      (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9);
     if (sevDiff !== 0) return sevDiff;
     return new Date(b.timestamp) - new Date(a.timestamp);
   });
@@ -10,7 +11,9 @@ export default function IncidentList({ incidents, selectedId, onSelect }) {
   return (
     <div className="card">
       <h2>Incidents</h2>
-      {sorted.length === 0 && <p className="muted">No incidents reported yet.</p>}
+      {sorted.length === 0 && (
+        <p className="muted">No incidents reported yet.</p>
+      )}
       <ul className="incident-list">
         {sorted.map((inc) => (
           <li
@@ -19,13 +22,19 @@ export default function IncidentList({ incidents, selectedId, onSelect }) {
             onClick={() => onSelect(inc.id)}
           >
             <div className="incident-row-top">
-              <span className={`pill pill-${inc.severity}`}>{inc.severity}</span>
+              <span className={`pill pill-${inc.severity}`}>
+                {inc.severity}
+              </span>
               <span className="incident-category">{inc.category}</span>
-              <span className={`review-tag review-${inc.review_status}`}>{inc.review_status}</span>
+              <span className={`review-tag review-${inc.review_status}`}>
+                {inc.review_status}
+              </span>
             </div>
             <div className="incident-row-bottom">
               <span>{inc.room}</span>
-              <span className="muted">{new Date(inc.timestamp + "Z").toLocaleTimeString()}</span>
+              <span className="muted">
+                {new Date(inc.timestamp).toLocaleTimeString()}
+              </span>
             </div>
           </li>
         ))}

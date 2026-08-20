@@ -22,14 +22,33 @@
         {telemetry.device_id} &middot; {telemetry.room}
       </p>
       <div className="stat-grid">
-        <Stat label="Temperature" value={`${telemetry.temperature_c ?? "--"} °C`} warn={telemetry.temperature_c > 45} />
+        <Stat
+          label="Temperature"
+          value={`${telemetry.temperature_c ?? "--"} °C`}
+          warn={telemetry.temperature_c > 45}
+        />
         <Stat label="Humidity" value={`${telemetry.humidity_pct ?? "--"} %`} />
-        <Stat label="Gas Level" value={telemetry.gas_level ?? "--"} warn={telemetry.gas_level > 700} />
-        <Stat label="Flame" value={telemetry.flame_detected ? "DETECTED" : "Clear"} warn={telemetry.flame_detected} />
-        <Stat label="Motion" value={telemetry.motion_detected ? "Detected" : "None"} />
+        <Stat
+          label="Gas Level"
+          value={telemetry.gas_level ?? "--"}
+          warn={telemetry.gas_level > 700}
+        />
+        <Stat
+          label="Flame"
+          value={telemetry.flame_detected ? "DETECTED" : "Clear"}
+          warn={telemetry.flame_detected}
+        />
+        <Stat
+          label="Motion"
+          value={telemetry.motion_detected ? "Detected" : "None"}
+        />
         <Stat
           label="Last Reading"
-          value={telemetry.timestamp ? new Date(telemetry.timestamp + "Z").toLocaleTimeString() : "--"}
+          value={
+            telemetry.timestamp
+              ? new Date(telemetry.timestamp).toLocaleTimeString()
+              : "--"
+          }
         />
       </div>
     </div>

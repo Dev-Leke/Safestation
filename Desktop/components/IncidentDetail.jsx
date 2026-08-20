@@ -31,7 +31,9 @@ export default function IncidentDetail({ incident, onChanged }) {
     <div className="card">
       <div className="card-header">
         <h2>Incident {incident.event_id.slice(0, 8)}</h2>
-        <span className={`pill pill-${incident.severity}`}>{incident.severity}</span>
+        <span className={`pill pill-${incident.severity}`}>
+          {incident.severity}
+        </span>
       </div>
 
       <p className="muted small">
@@ -52,7 +54,9 @@ export default function IncidentDetail({ incident, onChanged }) {
         </div>
         <div>
           <div className="stat-label">Review Status</div>
-          <div className={`review-tag review-${incident.review_status}`}>{incident.review_status}</div>
+          <div className={`review-tag review-${incident.review_status}`}>
+            {incident.review_status}
+          </div>
         </div>
         <div>
           <div className="stat-label">Notification</div>
@@ -74,9 +78,27 @@ export default function IncidentDetail({ incident, onChanged }) {
       <h3>Recommended Action</h3>
       <p>{incident.recommended_action || "—"}</p>
 
-      {incident.snapshot_ref && (
-        <p className="muted small">Camera snapshot: {incident.snapshot_ref}</p>
-      )}
+      {incident.snapshot_ref &&
+        incident.snapshot_ref.includes("blob.core.windows.net") && (
+          <div style={{ marginTop: "1rem" }}>
+            <h3>Camera Snapshot</h3>
+            <img
+              src={incident.snapshot_ref}
+              alt="Incident snapshot"
+              style={{
+                maxWidth: "100%",
+                borderRadius: "8px",
+                border: "1px solid #333",
+              }}
+            />
+          </div>
+        )}
+      {incident.snapshot_ref &&
+        !incident.snapshot_ref.includes("blob.core.windows.net") && (
+          <p className="muted small">
+            Camera snapshot: {incident.snapshot_ref}
+          </p>
+        )}
 
       <div className="actions">
         {incident.review_status === "pending" && (
@@ -84,24 +106,37 @@ export default function IncidentDetail({ incident, onChanged }) {
             <button
               disabled={busy}
               className="btn btn-approve"
-              onClick={() => act(() => api.reviewIncident(incident.id, "approved", "abimbola"))}
+              onClick={() =>
+                act(() =>
+                  api.reviewIncident(incident.id, "approved", "abimbola"),
+                )
+              }
             >
               Approve
             </button>
             <button
               disabled={busy}
               className="btn btn-reject"
-              onClick={() => act(() => api.reviewIncident(incident.id, "rejected", "abimbola"))}
+              onClick={() =>
+                act(() =>
+                  api.reviewIncident(incident.id, "rejected", "abimbola"),
+                )
+              }
             >
               Reject
             </button>
           </>
         )}
-        {incident.review_status === "approved" && incident.notification_status !== "sent" && (
-          <button disabled={busy} className="btn btn-notify" onClick={() => act(() => api.notifyIncident(incident.id))}>
-            Send notification
-          </button>
-        )}
+        {incident.review_status === "approved" &&
+          incident.notification_status !== "sent" && (
+            <button
+              disabled={busy}
+              className="btn btn-notify"
+              onClick={() => act(() => api.notifyIncident(incident.id))}
+            >
+              Send notification
+            </button>
+          )}
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -113,7 +148,8 @@ export default function IncidentDetail({ incident, onChanged }) {
             <strong>SMS:</strong> {incident.notification_payload.sms_text}
           </p>
           <p>
-            <strong>Email subject:</strong> {incident.notification_payload.email_subject}
+            <strong>Email subject:</strong>{" "}
+            {incident.notification_payload.email_subject}
           </p>
           <pre>{incident.notification_payload.email_body}</pre>
         </div>
